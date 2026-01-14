@@ -4,7 +4,8 @@ A **scalable and real-time ride-sharing backend** built with **Django**, **Djang
 The system is designed to support **REST APIs** and **real-time WebSocket communication** using **Redis**, enabling features like live ride updates, notifications, and asynchronous events.
 
 ---
-
+# NOTE
+ **Cuurently i'm working on frontend but backend-API's is Fully completed.**
 ## Project Overview
 
 The RideShare API handles:
