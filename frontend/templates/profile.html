@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card-glass p-4" style="padding:20px;">
+    <h2 id="profileHeading">My Profile</h2>
+
+    <div style="display:flex; gap:20px; align-items:flex-start; margin-top:16px;">
+      <div style="width:220px;">
+        <img id="profileImg" src="{% static 'frontend/images/avatar-placeholder.png' %}" alt="profile" style="width:200px; height:200px; object-fit:cover; border-radius:12px; border:1px solid rgba(0,0,0,0.08)">
+        <input type="file" id="profileFile" accept="image/*" style="margin-top:10px;">
+      </div>
+
+      <div style="flex:1;">
+        <div style="display:flex; gap:12px; margin-bottom:10px;">
+          <div style="flex:1">
+            <label>Username</label>
+            <input id="username" class="form-control" />
+          </div>
+          <div style="flex:1">
+            <label>Email</label>
+            <input id="email" class="form-control" />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:10px;">
+          <div style="flex:1">
+            <label>Phone</label>
+            <input id="phone" class="form-control" />
+          </div>
+          <div style="flex:1">
+            <label>Role</label>
+            <input id="role" class="form-control" readonly />
+          </div>
+        </div>
+
+        <!-- driver-specific fields -->
+        <div id="driverSection" style="display:none; margin-top:12px;">
+          <h4>Driver Details</h4>
+          <div style="display:flex; gap:12px; margin-bottom:10px;">
+            <div style="flex:1">
+              <label>Vehicle Model</label>
+              <input id="vehicle_model" class="form-control" />
+            </div>
+            <div style="flex:1">
+              <label>Vehicle Number</label>
+              <input id="vehicle_number" class="form-control" />
+            </div>
+          </div>
+
+          <div style="display:flex; gap:12px; margin-bottom:10px;">
+            <div style="flex:1">
+              <label>Vehicle Type</label>
+              <input id="vehicle_type" class="form-control" />
+            </div>
+            <div style="flex:1">
+              <label>Availability</label>
+              <select id="is_available" class="form-control">
+                <option value="true">Available</option>
+                <option value="false">Not Available</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top:15px; display:flex; gap:10px;">
+    <button id="saveVehicleBtn" class="btn btn-gradient btn-sm" style="background:white">  Save Vehicle</button>
+    <button id="deleteVehicleBtn" class="btn btn-danger btn-sm" style="background:#ff4a4a;">Delete Vehicle</button>
+
+    <button id="toggleOnlineBtn" class="btn btn-success btn-sm">
+        Go Online
+    </button>
+</div>
+
+
+          <div style="margin-top:10px;">
+            <label>License Image</label><br/>
+            <img id="licenseImg" src="{% static 'frontend/images/license-placeholder.png' %}" alt="license" style="width:240px; height:150px; object-fit:cover; border-radius:8px; border:1px solid #ddd; display:block; margin-bottom:8px;">
+            <input type="file" id="licenseFile" accept="image/*">
+          </div>
+        </div>
+
+        <!-- passenger-specific fields -->
+        <div id="passengerSection" style="display:none; margin-top:12px;">
+          <h4>Passenger Details</h4>
+          <div style="margin-bottom:10px;">
+            <label>Default Payment</label>
+            <input id="default_payment_method" class="form-control" />
+          </div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <button id="saveBtn" class="btn btn-gradient" style="background:white">Save Profile</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="message" style="margin-top:12px; color:green; display:none"></div>
+  </div>
+</div>
+
+<script src="{% static 'frontend/js/ride.js' %}"></script>
+<script>
+(async function(){
+
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+  if (!token) {
+    alert('Not logged in');
+    window.location.href = '/login/';
+    return;
+  }
+
+  function setImageFromBase64(imgEl, b64) {
+    if (!b64) return;
+    imgEl.src = 'data:image/jpeg;base64,' + b64;
+  }
+
+  // -------- FETCH USER --------
+  const res = await fetch('/api/auth/me/', {
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
+  });
+
+  if (!res.ok) {
+    alert('Failed to load profile. Login again.');
+    localStorage.removeItem("access_token");
+    window.location.href = '/login/';
+    return;
+  }
+
+  const user = await res.json();
+
+  // -------- FILL BASIC FIELDS --------
+  document.getElementById('username').value = user.username || '';
+  document.getElementById('email').value = user.email || '';
+  document.getElementById('phone').value = user.phone || '';
+  document.getElementById('role').value = user.role || '';
+
+  if (user.profile_image) setImageFromBase64(document.getElementById('profileImg'), user.profile_image);
+
+  let dp = {}; // driver profile
+  let pp = {}; // passenger profile
+
+  // -------- DRIVER SECTION --------
+  if (user.role === "driver") {
+    document.getElementById('driverSection').style.display = "block";
+
+    dp = user.driver_profile || {};
+
+    document.getElementById('vehicle_model').value = dp.vehicle_model || '';
+    document.getElementById('vehicle_number').value = dp.vehicle_number || '';
+    document.getElementById('vehicle_type').value = dp.vehicle_type || '';
+    document.getElementById('is_available').value = dp.is_available ? "true" : "false";
+
+    if (dp.license_image) setImageFromBase64(document.getElementById('licenseImg'), dp.license_image);
+
+    // Set toggle button label
+    document.getElementById("toggleOnlineBtn").textContent =
+      dp.is_available ? "Go Offline" : "Go Online";
+  }
+
+  // -------- PASSENGER SECTION --------
+  else {
+    document.getElementById('passengerSection').style.display = "block";
+    pp = user.passenger_profile || {};
+    document.getElementById('default_payment_method').value = pp.default_payment_method || "";
+  }
+
+  // =====================================================================
+  //                            SAVE PROFILE
+  // =====================================================================
+
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+
+    document.getElementById('message').style.display = 'none';
+
+    // Profile img
+    let profile_b64 = null;
+    const profileFile = document.getElementById('profileFile').files[0];
+    if (profileFile) {
+      profile_b64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result.split(",")[1]);
+        r.onerror = reject;
+        r.readAsDataURL(profileFile);
+      });
+    }
+
+    // Update USER core fields
+    const userPayload = {
+      username: document.getElementById('username').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      phone: document.getElementById('phone').value.trim()
+    };
+    if (profile_b64) userPayload.profile_image = profile_b64;
+
+    const ures = await fetch('/api/auth/me/', {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify(userPayload)
+    });
+
+    if (!ures.ok) {
+      alert("Failed to update basic profile.");
+      return;
+    }
+
+    // DRIVER UPDATE
+    if (user.role === "driver") {
+
+      // License image
+      let license_b64 = null;
+      const licFile = document.getElementById("licenseFile").files[0];
+      if (licFile) {
+        license_b64 = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result.split(",")[1]);
+          r.onerror = reject;
+          r.readAsDataURL(licFile);
+        });
+      }
+
+      const driverPayload = {
+        vehicle_model: document.getElementById('vehicle_model').value.trim(),
+        vehicle_number: document.getElementById('vehicle_number').value.trim(),
+        vehicle_type: document.getElementById('vehicle_type').value.trim(),
+        is_available: document.getElementById('is_available').value === 'true'
+      };
+
+      if (license_b64) driverPayload.license_image = license_b64;
+
+      const dres = await fetch('/api/auth/driver/profile/', {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify(driverPayload)
+      });
+
+      if (!dres.ok) {
+        alert("Failed to update driver details!");
+        return;
+      }
+    }
+
+    // PASSENGER UPDATE
+    if (user.role === "passenger") {
+      const passengerPayload = {
+        default_payment_method: document.getElementById("default_payment_method").value.trim() || null
+      };
+
+      await fetch('/api/auth/passenger/profile/', {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify(passengerPayload)
+      });
+    }
+
+    document.getElementById("message").textContent = "Profile updated successfully!";
+    document.getElementById("message").style.display = "block";
+
+    setTimeout(() => location.reload(), 800);
+  });
+
+  // =====================================================================
+  //                           DELETE VEHICLE
+  // =====================================================================
+
+  const deleteVehicleBtn = document.getElementById("deleteVehicleBtn");
+  if (deleteVehicleBtn) {
+    deleteVehicleBtn.addEventListener("click", async () => {
+
+      if (!confirm("Remove ALL vehicle details?")) return;
+
+      const payload = {
+        vehicle_number: "",
+        vehicle_model: "",
+        vehicle_type: "",
+        license_image: ""
+      };
+
+      const res = await fetch("/api/auth/driver/profile/", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Vehicle details removed!");
+        location.reload();
+      } else {
+        alert("Unable to delete vehicle details.");
+      }
+    });
+  }
+
+  // =====================================================================
+  //                        TOGGLE ONLINE / OFFLINE
+  // =====================================================================
+
+  const toggleBtn = document.getElementById("toggleOnlineBtn");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", async () => {
+
+      let current = document.getElementById("is_available").value === "true";
+
+      const payload = { is_available: !current };
+
+      const res = await fetch("/api/auth/driver/profile/", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        document.getElementById("is_available").value = (!current).toString();
+        toggleBtn.textContent = !current ? "Go Offline" : "Go Online";
+        alert("Availability Updated!");
+      } else {
+        alert("Failed to update availability.");
+      }
+    });
+  }
+
+})();
+</script>
+
+{% endblock %}

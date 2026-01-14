@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ride Status{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card-glass p-4">
+    <h2>Ride Status</h2>
+
+    <div id="statusBox" class="my-3">
+      <p><strong>Ride ID:</strong> <span id="rideId">-</span></p>
+      <p><strong>Status:</strong> <span id="rideStatusText">waiting</span></p>
+      <p id="driverInfo" style="display:none"><strong>Driver:</strong> <span id="driverName">-</span></p>
+    </div>
+
+    <div id="actions" class="my-3">
+      <!-- optional actions appear here -->
+    </div>
+
+    <div id="mapMini" style="height:320px; border-radius:12px; background:#e9eefc;">
+      <!-- live map preview - use Leaflet or Google Maps in ride.js -->
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/ride.js' %}"></script>
+<script>
+  const rideId = localStorage.getItem('currentRideId');
+  document.getElementById('rideId').innerText = rideId || '-';
+
+  // initialize WebSocket to listen to ride updates
+  if (rideId) {
+    startRideSocket(rideId, updateRideUI);
+  }
+
+  function updateRideUI(data) {
+    // data example: { status: "accepted", driver: {username: "Hamza", vehicle: "Yaris"}, lat: ..., lng: ...}
+    document.getElementById('rideStatusText').innerText = data.status || 'unknown';
+
+    if (data.driver) {
+      document.getElementById('driverInfo').style.display = 'block';
+      document.getElementById('driverName').innerText = data.driver.username || data.driver;
+    }
+
+    // update map marker using helper in ride.js
+    if (data.lat && data.lng) {
+      updateDriverMarker(data.lat, data.lng);
+    }
+
+    if (data.status === 'completed') {
+      // show fare if included
+      if (data.fare) {
+        alert('Trip completed. Fare: ' + data.fare.total_fare);
+        localStorage.removeItem('currentRideId');
+      }
+    }
+  }
+</script>
+{% endblock %}

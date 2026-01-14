@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Driver Requests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card-glass p-4">
+    <h2>Pending Ride Requests</h2>
+    <div id="pendingList" class="row g-3 mt-3"></div>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('access_token');
+
+// ----------- LOAD PENDING REQUESTS FROM API -----------
+async function loadPending() {
+    const res = await fetch('/api/rides/pending-for-driver/', {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? {'Authorization': 'Bearer ' + token} : {})
+        }
+    });
+
+    const list = await res.json();
+    const box = document.getElementById('pendingList');
+    box.innerHTML = "";
+
+    if (!list.length) {
+        box.innerHTML = '<p class="text-light">No pending requests.</p>';
+        return;
+    }
+
+    list.forEach(r => {
+        const card = document.createElement("div");
+        card.className = "col-md-6";
+        card.innerHTML = `
+            <div class="card p-3 card-glass">
+                <h5>Ride #${r.id} — ${r.passenger_name}</h5>
+                <p><strong>Pickup:</strong> ${r.pickup_lat}, ${r.pickup_lng}</p>
+                <p><strong>Drop:</strong> ${r.drop_lat}, ${r.drop_lng}</p>
+                <button class="btn btn-primary" onclick="acceptRide(${r.id})">Accept</button>
+            </div>
+        `;
+        box.appendChild(card);
+    });
+}
+
+// ------------- ACCEPT RIDE ----------------
+async function acceptRide(rideId) {
+    const res = await fetch(`/api/rides/accept/${rideId}/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": "Bearer " + token } : {})
+        }
+    });
+
+    if (res.ok) {
+        alert("Ride accepted!");
+        loadPending();
+        window.location.href = `/driver/ride/${rideId}/track/`;
+    } else {
+        alert("Failed to accept ride.");
+    }
+}
+
+// ----------- REALTIME WEBSOCKET LISTENING -----------
+const wsProtocol = location.protocol === "https:" ? "wss://" : "ws://";
+const ws = new WebSocket(wsProtocol + location.host + "/ws/online-drivers/");
+
+ws.onopen = () => console.log("Driver WS Connected");
+ws.onclose = () => console.log("Driver WS Disconnected");
+
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === "new_ride_request") {
+        console.log("New ride:", msg.ride);
+        loadPending();
+    }
+};
+
+// Load on page open
+loadPending();
+</script>
+{% endblock %}

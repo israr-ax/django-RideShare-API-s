@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passenger Dashboard | RideShare</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        background: #f2f4ff;
+    }
+
+    /* Sidebar */
+    .sidebar {
+        width: 230px;
+        height: 100vh;
+        background: linear-gradient(180deg, #4b79ff, #5f54ff);
+        padding: 20px;
+        position: fixed;
+        color: white;
+        animation: fadeInLeft 0.6s ease;
+    }
+
+    .sidebar h2 {
+        text-align: center;
+        margin-bottom: 30px;
+        font-weight: 600;
+    }
+
+    .sidebar a {
+        display: block;
+        color: white;
+        text-decoration: none;
+        padding: 12px;
+        margin: 8px 0;
+        border-radius: 8px;
+        transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+        background: rgba(255,255,255,0.2);
+        transform: scale(1.05);
+    }
+
+    /* Content Area */
+    .content {
+        margin-left: 250px;
+        padding: 25px;
+        animation: fadeIn 1s ease;
+    }
+
+    .topbar {
+        background: white;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .cards {
+        margin-top: 25px;
+        display: flex;
+        gap: 20px;
+    }
+
+    .card {
+        background: white;
+        padding: 25px;
+        border-radius: 14px;
+        flex: 1;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        animation: slideUp 0.8s ease;
+    }
+
+    .card h3 {
+        margin: 0 0 10px 0;
+    }
+
+    .card button {
+        padding: 12px;
+        width: 100%;
+        margin-top: 15px;
+        border: none;
+        background: #4b79ff;
+        color: white;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+
+    .card button:hover {
+        background: #3f68e7;
+        transform: scale(1.03);
+    }
+
+    /* Table for Recent Rides */
+    table {
+        width: 100%;
+        margin-top: 30px;
+        border-collapse: collapse;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    table th, table td {
+        padding: 14px;
+        text-align: left;
+        background: white;
+        font-size: 14px;
+    }
+
+    table th {
+        background: #4b79ff;
+        color: white;
+    }
+
+    @keyframes fadeInLeft {
+        from { opacity: 0; transform: translateX(-40px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(25px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>RideShare</h2>
+    <a href="#">Dashboard</a>
+    <a onclick="window.location.href='/bookride'">Book a Ride</a>
+    <a href="#">Ride History</a>
+    <a href="{% url 'available_drivers' %}">Nearby Drivers</a>
+    <a onclick="window.location.href='/profile/'">Profile</a>
+    <a onclick="window.location.href='/login/'">Logout</a>
+</div>
+
+<div class="content">
+
+    <div class="topbar">
+        <h2>Welcome, Passenger 👋</h2>
+        <div>User Profile</div>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <h3>Quick Book</h3>
+            <p>Book a new ride instantly</p>
+            <button onclick="window.location.href='/bookride'">Book Now</button>
+        </div>
+
+        <div class="card">
+            <h3>Active Ride</h3>
+            <p>No ongoing rides</p>
+        </div>
+
+        <div class="card">
+            <h3>Total Rides</h3>
+            <p>12 Completed</p>
+        </div>
+    </div>
+
+    <h2 style="margin-top: 40px;">Recent Rides</h2>
+
+    <table>
+        <tr>
+            <th>From</th>
+            <th>To</th>
+            <th>Date</th>
+            <th>Status</th>
+        </tr>
+
+        <tr>
+            <td>Blue Area</td>
+            <td>F-10</td>
+            <td>20 Feb 2025</td>
+            <td>Completed</td>
+        </tr>
+
+        <tr>
+            <td>G-11</td>
+            <td>I-8</td>
+            <td>18 Feb 2025</td>
+            <td>Completed</td>
+        </tr>
+    </table>
+
+</div>
+
+<script>
+(function(){
+  // use correct ws protocol for secure (wss) vs http (ws)
+  const loc = window.location;
+  const wsProtocol = loc.protocol === 'https:' ? 'wss://' : 'ws://';
+  const wsBase = wsProtocol + loc.host;
+  // path must match routing: /ws/online-drivers/
+  const ws = new WebSocket(wsBase + '/ws/online-drivers/');
+
+  ws.onopen = () => console.log('Connected to online drivers feed');
+  ws.onmessage = (evt) => {
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.type === 'driver.location') {
+        const d = data.driver;
+        console.log('Driver update', d);
+        // Example: if using Leaflet map, update marker
+        // updateDriverMarker(d.id, d.lat, d.lng, d.vehicle_model);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  ws.onclose = () => console.log('Disconnected from drivers feed');
+})();
+</script>
+
+</body>
+</html>

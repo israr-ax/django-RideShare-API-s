@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Nearby Drivers{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+
+<style>
+  /* Ensure card styling doesn't break the map */
+  .card-glass {
+      backdrop-filter: none !important; /* disable blur for card header where map sits below */
+      background: rgba(0,0,0,0.15) !important;
+      position: relative;
+      z-index: 1;
+      overflow: visible !important;
+  }
+
+  /* we place the map OUTSIDE the glass card (see HTML) - this is critical */
+  #map {
+      width: 100% !important;
+      height: 550px !important;
+      min-height: 550px !important;
+      position: relative !important;
+      z-index: 5 !important;
+      overflow: visible !important;
+      border-radius: 12px;
+      box-shadow: 0 3px 15px rgba(0,0,0,0.15);
+  }
+
+  /* ensure Leaflet container isn't warped */
+  .leaflet-container {
+      background: #f3f3f3 !important;
+      transform: none !important;
+  }
+
+  .leaflet-popup-content {
+      color: #111;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card-glass p-4 mb-3">
+    <h2>Available Drivers (Live)</h2>
+    <p class="text-muted">Watch drivers coming online in real time.</p>
+  </div>
+
+  <!-- PLACE MAP OUTSIDE ANY GLASS/BLUR CARD -->
+  <div id="map" aria-label="Nearby drivers map"></div>
+</div>
+
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin="">
+</script>
+
+<script>
+(function () {
+  // 1) Initialize map
+  const center = [33.6844, 73.0479]; // Islamabad example
+  const map = L.map("map", { zoomControl: true, preferCanvas: true }).setView(center, 12);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  // force a resize after layout finishes (fixes many tile problems)
+  setTimeout(() => map.invalidateSize(true), 300);
+
+  // driver markers store
+  const driverMarkers = {};
+
+  function upsertDriverMarker(driver) {
+      const id = driver.id;
+      const lat = parseFloat(driver.lat);
+      const lng = parseFloat(driver.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+    const profileImg = driver.profile_image
+  ?     `<img src="data:image/jpeg;base64,${driver.profile_image}" 
+              style="width:60px;height:60px;border-radius:50%;object-fit:cover;margin-bottom:6px;">`
+    : `<img src="https://cdn-icons-png.flaticon.com/512/149/149071.png"
+              style="width:60px;height:60px;border-radius:50%;margin-bottom:6px;">`;
+
+    const popupText = `
+        <div style="text-align:center;">
+            ${profileImg}
+            <div><b>${driver.username}</b></div>
+            <div>🚗 <b>${driver.vehicle_model || 'N/A'}</b></div>
+            <div>🔢 ${driver.vehicle_number || 'N/A'}</div>
+        </div>
+    `;
+
+
+      if (driverMarkers[id]) {
+          driverMarkers[id].setLatLng([lat, lng]).setPopupContent(popupText);
+      } else {
+          driverMarkers[id] = L.marker([lat, lng]).addTo(map).bindPopup(popupText);
+      }
+  }
+
+  function removeDriverMarker(id) {
+      if (driverMarkers[id]) {
+          map.removeLayer(driverMarkers[id]);
+          delete driverMarkers[id];
+      }
+  }
+
+  // 3) WebSocket feed
+  const wsProtocol = location.protocol === "https:" ? "wss://" : "ws://";
+  const wsUrl = wsProtocol + location.host + "/ws/online-drivers/";
+  console.log("Connecting WS:", wsUrl);
+
+  let ws;
+  function connectWS() {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => console.log("WS connected to online drivers");
+      ws.onerror = (e) => console.error("WS error", e);
+      ws.onclose = (e) => {
+          console.log("WS closed, reconnecting in 2s...", e);
+          setTimeout(connectWS, 2000);
+      };
+
+      ws.onmessage = (evt) => {
+          try {
+              const msg = JSON.parse(evt.data);
+              if (msg.type === "driver.location") {
+                  const d = msg.driver;
+                  // if driver not available remove them
+                  if (!d.is_available) removeDriverMarker(d.id);
+                  else upsertDriverMarker(d);
+              }
+          } catch (err) { console.error("WS parse error", err); }
+      };
+  }
+
+  connectWS();
+
+})();
+</script>
+{% endblock %}

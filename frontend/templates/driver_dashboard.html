@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ 
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+   
+<title>Driver Dashboard | RideShare</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        background: #eef2ff;
+    }
+
+    .sidebar {
+        width: 230px;
+        height: 100vh;
+        background: linear-gradient(180deg, #ff8f4b, #ff4bc0);
+        padding: 20px;
+        position: fixed;
+        color: white;
+        animation: fadeInLeft 0.6s ease;
+    }
+
+    .sidebar h2 {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .sidebar a {
+        display: block;
+        padding: 12px;
+        margin: 8px 0;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: 0.3s;
+    }
+
+    .sidebar a:hover {
+        background: rgba(255,255,255,0.2);
+        transform: scale(1.05);
+    }
+
+    .content {
+        margin-left: 250px;
+        padding: 25px;
+        animation: fadeIn 1s ease;
+    }
+
+    .topbar {
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+
+    .cards {
+        display: flex;
+        gap: 20px;
+        margin-top: 30px;
+    }
+
+    .card {
+        background: white;
+        padding: 25px;
+        flex: 1;
+        border-radius: 12px;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        animation: slideUp 0.8s ease;
+    }
+
+    table {
+        margin-top: 30px;
+        width: 100%;
+        border-collapse: collapse;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+
+    table th {
+        background: #ff6f61;
+        color: white;
+        padding: 14px;
+    }
+
+    table td {
+        padding: 14px;
+        background: white;
+    }
+
+    @keyframes fadeInLeft {
+        from { opacity: 0; transform: translateX(-40px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(25px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Driver Panel</h2>
+    <a href="#">Dashboard</a>
+    <a onclick="window.location.href='/driver/requests/'">Ride Requests</a>
+    <a href="#">My Vehicle</a>
+    <a href="#">Earnings</a>
+    <a onclick="window.location.href='/profile/'">Profile</a>
+    <a onclick="window.location.href='/login/'">Logout</a>
+</div>
+
+<div class="content">
+
+    <div class="topbar">
+        <h2>Welcome, Driver 🚗</h2>
+        <button id="goOnlineBtn" style="padding: 10px 15px; border:none; background:#ff6f61; color:white; border-radius:8px; cursor:pointer;">Go Online</button>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <h3>Today's Earnings</h3>
+            <h1>$45</h1>
+        </div>
+
+        <div class="card">
+            <h3>Completed Rides</h3>
+            <h1>8</h1>
+        </div>
+
+        <div class="card">
+            <h3>Rating</h3>
+            <h1>4.9 ★</h1>
+        </div>
+    </div>
+
+    <h2 style="margin-top: 30px;">Active Ride Requests</h2>
+
+    <table>
+        <tr>
+            <th>Passenger</th>
+            <th>Pickup</th>
+            <th>Drop</th>
+            <th>Action</th>
+        </tr>
+
+        <tr>
+            <td>Ali</td>
+            <td>G-10</td>
+            <td>I-9</td>
+            <td><button style="padding: 5px 12px;">Accept</button></td>
+        </tr>
+
+        <tr>
+            <td>Ahmed</td>
+            <td>F-6</td>
+            <td>F-10</td>
+            <td><button style="padding: 8px 12px;">Accept</button></td>
+        </tr>
+
+    </table>
+
+</div>
+<!-- Ride Request Popup -->
+<div id="ridePopup"
+     style="display:none; position:fixed; bottom:20px; right:20px; 
+            background:white; color:black; padding:20px; 
+            border-radius:12px; width:300px; box-shadow:0 5px 20px rgba(0,0,0,0.3); z-index:9999;">
+
+    <h4>🚖 New Ride Request</h4>
+    <p><b>Passenger:</b> <span id="rp_name"></span></p>
+    <p><b>Pickup:</b> <span id="rp_pickup"></span></p>
+    <p><b>Drop:</b> <span id="rp_drop"></span></p>
+
+    <button id="btnAcceptRide"
+            style="border:none; width:100%; margin-top:10px; padding:10px;
+                   background:#28a745; color:white; border-radius:8px;">
+        Accept Ride
+    </button>
+</div>
+
+
+<script>
+/*
+  DRIVER LIVE GPS TRACKING
+  - startTracking() called when "Go Online" clicked
+  - stopTracking() when "Go Offline"
+  - Uses navigator.geolocation.watchPosition
+  - Sends POST /api/auth/driver/location/ with lat,lng and Authorization header
+*/
+// universal token reader (use this once at top of your script)
+function getToken() {
+  return (
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access") ||
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("Authorization")
+  );
+}
+
+// variables used earlier
+let driverWatchId = null;
+let driverTracking = false;
+
+function startTracking() {
+  if (!('geolocation' in navigator)) {
+    alert('Geolocation not available.');
+    return;
+  }
+  if (driverTracking) return;
+  driverTracking = true;
+
+  // update UI
+  const toggleBtn = document.getElementById('goOnlineBtn') || document.getElementById('toggleOnlineBtn');
+  if (toggleBtn) toggleBtn.textContent = 'Go Offline';
+
+  driverWatchId = navigator.geolocation.watchPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    // get token & safety checks
+    const token = getToken();
+    if (!token) {
+      console.error("No token found in localStorage — cannot send location.");
+      alert("Not authenticated — please login again.");
+      stopTracking(); // stop to avoid spamming
+      return;
+    }
+
+    // send location
+    try {
+      const res = await fetch('/api/auth/driver/location/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // ensure "Bearer " prefix
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ lat: lat, lng: lng })
+      });
+
+      // Log status and body for debugging
+      let text;
+      try { text = await res.text(); } catch (e) { text = '<no body>'; }
+      console.log('Location POST', res.status, text);
+
+      if (res.status === 403) {
+        // helpful: show server message if present
+        try {
+          const json = JSON.parse(text);
+          console.warn('Server rejected location:', json);
+          alert('Server rejected location: ' + (json.detail || JSON.stringify(json)));
+        } catch(_) {
+          alert('Server rejected location (403). Check server logs.');
+        }
+        // stop to avoid spamming the server
+        stopTracking();
+      } else if (!res.ok) {
+        // handle other non-ok statuses
+        console.warn('Location POST failed:', res.status, text);
+      }
+      // on success (200/201) nothing to do
+    } catch (err) {
+      console.error('Network error sending location:', err);
+    }
+  }, (err) => {
+    console.warn('Geolocation error', err);
+  }, {
+    enableHighAccuracy: true,
+    maximumAge: 3000,
+    timeout: 5000
+  });
+}
+
+function stopTracking() {
+  if (!driverTracking) return;
+  driverTracking = false;
+  const toggleBtn = document.getElementById('goOnlineBtn') || document.getElementById('toggleOnlineBtn');
+  if (toggleBtn) toggleBtn.textContent = 'Go Online';
+  if (driverWatchId !== null) {
+    navigator.geolocation.clearWatch(driverWatchId);
+    driverWatchId = null;
+  }
+
+  // tell server we went offline (optional)
+  (async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await fetch('/api/auth/driver/profile/', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ is_available: false })
+      });
+    } catch (err) {
+      console.error('Failed to set offline', err);
+    }
+  })();
+}
+
+// toggle wrapper (attach to your Go Online button)
+function toggleDriverOnline() {
+  const btn = document.getElementById('goOnlineBtn') || document.getElementById('toggleOnlineBtn');
+  if (!driverTracking) {
+    // set backend is_available True first
+    const token = localStorage.getItem('access_token');
+    fetch('/api/auth/driver/profile/', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ is_available: true })
+    }).then(res => {
+      if (res.ok) {
+        startTracking();
+      } else {
+        alert('Could not go online (server refused).');
+      }
+    }).catch(err => {
+      console.error(err);
+      alert('Network error');
+    });
+  } else {
+    stopTracking();
+  }
+}
+
+// If you already have a toggle button, attach click handler:
+document.addEventListener('DOMContentLoaded', () => {
+  const b = document.getElementById('goOnlineBtn') || document.getElementById('toggleOnlineBtn');
+  if (b) b.addEventListener('click', toggleDriverOnline);
+});
+
+(function () {
+    const wsProtocol = location.protocol === "https:" ? "wss://" : "ws://";
+    const ws = new WebSocket(wsProtocol + location.host + "/ws/online-drivers/");
+
+    ws.onopen = () => console.log("Driver WS Connected");
+    ws.onerror = (e) => console.log("WS Error", e);
+    ws.onclose = () => console.log("WS Closed");
+
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        // NEW RIDE OFFER
+        if (msg.type === "new.ride.request") {
+            console.log("Incoming Ride:", msg.ride);
+            showRidePopup(msg.ride);
+        }
+    };
+})();
+
+let currentRideId = null;
+
+function showRidePopup(ride) {
+    currentRideId = ride.id;
+
+    document.getElementById("rp_name").innerText = ride.passenger_name;
+    document.getElementById("rp_pickup").innerText = ride.pickup_text || "Pickup Location";
+    document.getElementById("rp_drop").innerText = ride.drop_text || "Drop Location";
+
+    document.getElementById("ridePopup").style.display = "block";
+}
+
+document.getElementById("btnAcceptRide").onclick = function () {
+    if (!currentRideId) return;
+
+    const token = localStorage.getItem("access_token");
+
+    fetch(`/api/rides/accept/${currentRideId}/`, {
+        method: "POST",
+        headers: {
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json"
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert("Ride Accepted Successfully!");
+
+        // Hide popup
+        document.getElementById("ridePopup").style.display = "none";
+
+        // Redirect driver to ride navigation page
+        window.location.href = `/driver/ride/${currentRideId}/`;
+    })
+    .catch(err => console.error(err));
+};
+
+
+</script>
+
+</body>
+</html>

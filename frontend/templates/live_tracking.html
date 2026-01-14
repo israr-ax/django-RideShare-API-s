@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Live Tracking{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card-glass p-3">
+    <h2>Live Tracking</h2>
+    <p class="mb-2">Track your driver in real-time</p>
+
+    <div id="liveMap" style="height:600px; border-radius:12px;"></div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/ride.js' %}"></script>
+<script>
+  const rideId = localStorage.getItem('currentRideId');
+  if (!rideId) {
+    alert('No active ride. Redirecting to dashboard.');
+    window.location.href = "{% url 'passenger_dashboard' %}";
+  }
+
+  // init map
+  const map = L.map('liveMap').setView([24.8607, 67.0011], 13); // default Karachi center
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+  }).addTo(map);
+
+  // driver marker placeholder
+  window.driverMarker = L.marker([24.8607, 67.0011]).addTo(map);
+
+  // helper exposed by ride.js to handle marker updates
+  startRideSocket(rideId, (data) => {
+    if (data.lat && data.lng) {
+      const lat = data.lat, lng = data.lng;
+      window.driverMarker.setLatLng([lat, lng]);
+      map.panTo([lat, lng], { animate: true, duration: 0.7 });
+    }
+
+    if (data.status) {
+      console.log('status', data.status);
+    }
+  });
+</script>
+{% endblock %}

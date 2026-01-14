@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | RideShare</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #4b79ff, #924dff);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 360px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.16);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            text-align: center;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 25px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: none;
+            border-radius: 8px;
+            outline: none;
+            background: rgba(255,255,255,0.8);
+            transition: 0.3s;
+            font-size: 14px;
+        }
+
+        .input-group input:focus {
+            box-shadow: 0 0 8px #fff;
+            transform: scale(1.02);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #e2e2e2;
+            transform: scale(1.03);
+        }
+
+        .text {
+            text-align: center;
+            margin-top: 12px;
+            color: #fff;
+        }
+
+        .text a {
+            color: yellow;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>RideShare Login</h2>
+
+    <div class="input-group">
+        <input id="email" type="email" placeholder="Email">
+    </div>
+
+    <div class="input-group">
+        <input id="password" type="password" placeholder="Password">
+    </div>
+
+    <button onclick="loginUser()">Login</button>
+
+    <p class="text">Don't have an account? <a href="/register">Register</a></p>
+</div>
+
+<script>
+async function loginUser() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!email || !password) {
+    alert("Please fill all fields");
+    return;
+  }
+
+  // Send both email and username (username = email) — safe fallback
+  const payload = {
+    email: email,
+    username: email,   // <-- fallback to satisfy serializers expecting username
+    password: password
+  };
+
+  try {
+    const res = await fetch("/api/auth/login/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(()=>null);
+
+    if (res.ok && data && data.access) {
+      localStorage.setItem("access_token", data.access);
+      localStorage.setItem("refresh_token", data.refresh);
+      localStorage.setItem("current_user", JSON.stringify(data.user || {}));
+      // redirect by role (optional)
+      const role = data.user && data.user.role;
+      window.location.href = role === "driver" ? "/driver/dashboard/" : "/passenger/dashboard/";
+    } else {
+      alert(data && (data.detail || JSON.stringify(data)) || "Login failed");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Network error — check server console.");
+  }
+}
+</script>
+
+
+</body>
+</html>

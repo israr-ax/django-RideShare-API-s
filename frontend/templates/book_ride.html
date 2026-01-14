@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Book Ride - Passenger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<header class="bg-white shadow p-4 flex justify-between items-center">
+  <h1 class="text-2xl font-bold text-blue-600">RideShare</h1>
+  <a href="/passenger/dashboard" class="text-gray-600 hover:text-blue-600 text-lg">Dashboard</a>
+</header>
+
+<main class="max-w-xl mx-auto mt-10 bg-white shadow-lg rounded-2xl p-8">
+
+  <h2 class="text-2xl font-semibold mb-6 text-gray-800 text-center">Book Your Ride</h2>
+
+  <form id="bookRideForm" class="space-y-4">
+
+    <!-- Pickup -->
+    <div>
+      <label class="block font-medium text-gray-700">Pickup Location</label>
+      <input id="pickup" type="text" required
+             class="w-full mt-1 p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+             placeholder="Enter pickup point">
+    </div>
+
+    <!-- Drop-off -->
+    <div>
+      <label class="block font-medium text-gray-700">Drop-off Location</label>
+      <input id="dropoff" type="text" required
+             class="w-full mt-1 p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+             placeholder="Enter destination">
+    </div>
+
+    <!-- Date & Time -->
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block font-medium text-gray-700">Date</label>
+        <input id="date" type="date" required
+               class="w-full mt-1 p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+      </div>
+      <div>
+        <label class="block font-medium text-gray-700">Time</label>
+        <input id="time" type="time" required
+               class="w-full mt-1 p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+      </div>
+    </div>
+
+    <!-- Ride Type -->
+    <div>
+      <label class="block font-medium text-gray-700 mb-1">Select Ride Type</label>
+      <div id="rideTypeBox" class="grid grid-cols-3 gap-4">
+        <label for="rt_bike"
+               class="rideTypeOption group block text-center p-4 border rounded-xl cursor-pointer transition">
+          <input id="rt_bike" name="ride_type" type="radio" value="bike" class="hidden" checked>
+          <div class="text-sm font-medium"><span class="block">Bike</span><span class="text-xs text-gray-500 mt-1">Economy</span></div>
+        </label>
+
+        <label for="rt_car"
+               class="rideTypeOption group block text-center p-4 border rounded-xl cursor-pointer transition">
+          <input id="rt_car" name="ride_type" type="radio" value="car" class="hidden">
+          <div class="text-sm font-medium"><span class="block">Car</span><span class="text-xs text-gray-500 mt-1">Comfort</span></div>
+        </label>
+
+        <label for="rt_premium"
+               class="rideTypeOption group block text-center p-4 border rounded-xl cursor-pointer transition">
+          <input id="rt_premium" name="ride_type" type="radio" value="premium" class="hidden">
+          <div class="text-sm font-medium"><span class="block">Premium</span><span class="text-xs text-gray-500 mt-1">Luxury</span></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Estimated Fare -->
+    <div id="fareBox" class="hidden bg-blue-50 border border-blue-200 p-4 rounded-xl mt-4">
+      <p class="text-lg font-semibold text-blue-700">Estimated Fare: <span id="fareAmount">—</span></p>
+    </div>
+
+    <!-- Submit -->
+    <button id="findDriversBtn" type="submit"
+            class="w-full bg-blue-600 text-white py-3 rounded-xl text-lg font-medium hover:bg-blue-700 transition shadow">
+      Find Drivers
+    </button>
+  </form>
+
+  <!-- Waiting panel (hidden until booking) -->
+  <div id="waitingPanel" class="hidden mt-6 p-4 rounded-lg bg-white border shadow flex flex-col gap-3">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 id="waitTitle" class="text-lg font-semibold">Waiting for driver...</h3>
+        <p id="waitSub" class="text-sm text-gray-600">We are looking for nearby drivers</p>
+      </div>
+      <div id="spinner" class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+        <svg class="w-6 h-6 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 4v4m0 8v4m8-8h-4M4 12H0"/>
+        </svg>
+      </div>
+    </div>
+
+    <div id="driverInfo" class="hidden flex gap-3 items-center">
+      <img id="driverAvatar" src="" alt="driver" class="w-16 h-16 rounded-md object-cover border">
+      <div>
+        <div id="driverName" class="font-semibold"></div>
+        <div id="driverVehicle" class="text-sm text-gray-600"></div>
+      </div>
+    </div>
+
+    <div class="flex gap-2">
+      <button id="cancelRequestBtn" class="flex-1 px-3 py-2 rounded bg-red-500 text-white">Cancel Request</button>
+      <button id="refreshBtn" class="flex-1 px-3 py-2 rounded bg-gray-100 text-gray-800">Refresh</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* Helper: token retrieval (support both keys used in project) */
+function getAuthToken() {
+  return localStorage.getItem('access_token') || localStorage.getItem('token') || null;
+}
+
+/* UI helpers */
+const rideTypeOptions = document.querySelectorAll('.rideTypeOption');
+const fareBox = document.getElementById('fareBox');
+const fareAmountEl = document.getElementById('fareAmount');
+const pickupEl = document.getElementById('pickup');
+const dropoffEl = document.getElementById('dropoff');
+
+function refreshRideTypeUI() {
+  rideTypeOptions.forEach(opt => {
+    const radio = opt.querySelector('input[type=radio]');
+    if (radio.checked) {
+      opt.classList.add('bg-blue-600','text-white','border-blue-600');
+      opt.classList.remove('border-gray-200');
+    } else {
+      opt.classList.remove('bg-blue-600','text-white','border-blue-600');
+      opt.classList.add('border-gray-200');
+    }
+  });
+}
+
+/* Make whole labels clickable and maintain keyboard accessibility */
+rideTypeOptions.forEach(opt => {
+  opt.addEventListener('click', () => {
+    const r = opt.querySelector('input[type=radio]');
+    r.checked = true;
+    refreshRideTypeUI();
+    calculateFare();
+  });
+  // improve keyboard support
+  opt.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      opt.click();
+    }
+  });
+});
+refreshRideTypeUI();
+
+/* Fare calculation - simple demo logic (replace with real distance calc later) */
+function calculateFare() {
+  const pickup = pickupEl.value.trim();
+  const drop = dropoffEl.value.trim();
+  if (pickup.length < 2 || drop.length < 2) {
+    return;
+  }
+
+  const rideType = document.querySelector('input[name="ride_type"]:checked').value;
+  let base = 120;
+  if (rideType === 'car') base = 220;
+  if (rideType === 'premium') base = 350;
+
+  const fare = base + Math.floor(Math.random()*50);
+  fareBox.classList.remove('hidden');
+  fareAmountEl.innerText = 'PKR ' + fare;
+}
+
+pickupEl.addEventListener('input', calculateFare);
+dropoffEl.addEventListener('input', calculateFare);
+document.querySelectorAll('input[name="ride_type"]').forEach(r=> r.addEventListener('change', () => { refreshRideTypeUI(); calculateFare(); }));
+
+/* Booking flow */
+const form = document.getElementById('bookRideForm');
+const findBtn = document.getElementById('findDriversBtn');
+const waitingPanel = document.getElementById('waitingPanel');
+const waitTitle = document.getElementById('waitTitle');
+const waitSub = document.getElementById('waitSub');
+const cancelRequestBtn = document.getElementById('cancelRequestBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+const driverInfo = document.getElementById('driverInfo');
+const driverAvatar = document.getElementById('driverAvatar');
+const driverNameEl = document.getElementById('driverName');
+const driverVehicleEl = document.getElementById('driverVehicle');
+
+let rideWebSocket = null;
+let currentRideId = null;
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const token = getAuthToken();
+  if (!token) {
+    alert('Please login first.');
+    return;
+  }
+
+  const pickup_text = pickupEl.value.trim();
+  const drop_text = dropoffEl.value.trim();
+  const ride_type = document.querySelector('input[name="ride_type"]:checked').value;
+
+  // NOTE: using placeholder coordinates for now — replace with maps/geocoding
+  const payload = {
+    pickup_lat: 33.6844,
+    pickup_lng: 73.0479,
+    drop_lat: 33.7001,
+    drop_lng: 73.0933,
+    pickup_text,
+    drop_text,
+    ride_type
+  };
+
+  // UI: disable button + show loading
+  findBtn.disabled = true;
+  findBtn.innerText = 'Requesting...';
+
+  try {
+    const resp = await fetch('/api/rides/create/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await resp.json().catch(()=>null);
+
+    if (!resp.ok) {
+      console.error('Create ride error', data);
+      alert('Could not create ride: ' + (data && (data.detail || JSON.stringify(data)) || resp.status));
+      return;
+    }
+
+    // backend may return ride_id or id — handle both
+    const rideId = data.ride_id || data.id || (data && data.ride && data.ride.id) || null;
+    if (!rideId) {
+      console.warn('No ride id in response, using fallback', data);
+    } else {
+      currentRideId = rideId;
+    }
+
+    // show waiting UI
+    waitingPanel.classList.remove('hidden');
+    waitTitle.innerText = 'Waiting for driver...';
+    waitSub.innerText = 'We are notifying nearby drivers. This may take a few seconds.';
+
+    // store for later pages
+    if (rideId) localStorage.setItem('currentRideId', rideId);
+
+    // Connect to ride websocket (if ride id exists)
+    if (rideId) {
+      openRideSocket(rideId);
+    } else {
+      // fallback: open a generic driver feed? we prefer ride socket when available
+      console.warn('Ride created but no id; not opening ride-specific socket.');
+    }
+
+  } catch (err) {
+    console.error('Network/create error', err);
+    alert('Network error while creating ride. See console.');
+  } finally {
+    findBtn.disabled = false;
+    findBtn.innerText = 'Find Drivers';
+  }
+});
+
+/* Open ride websocket and handle incoming updates */
+function openRideSocket(rideId) {
+  if (rideWebSocket) {
+    try { rideWebSocket.close(); } catch(e) {}
+    rideWebSocket = null;
+  }
+
+  const protocol = (location.protocol === 'https:') ? 'wss://' : 'ws://';
+  const url = protocol + location.host + '/ws/ride/' + rideId + '/';
+
+  try {
+    rideWebSocket = new WebSocket(url);
+  } catch (err) {
+    console.error('WS open error', err);
+    waitSub.innerText = 'WebSocket failed to open (check server).';
+    return;
+  }
+
+  rideWebSocket.onopen = () => {
+    console.log('Ride WS connected', url);
+  };
+
+  rideWebSocket.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch(e){ msg = evt.data; }
+
+    console.log('Ride WS message', msg);
+
+    // Accept both shapes: { status, driver_name, driver_id } or { type, data... }
+    const status = msg.status || (msg.data && msg.data.status) || null;
+
+    if (status === 'accepted' || (msg.status === 'accepted')) {
+      // driver accepted - show driver details if available
+      const driverName = msg.driver_name || (msg.data && msg.data.driver_name) || 'Driver';
+      const driverId = msg.driver_id || (msg.data && msg.data.driver_id) || null;
+      const vehicle = (msg.data && (msg.data.vehicle_model || msg.data.vehicle_number)) || msg.vehicle || '';
+
+      waitTitle.innerText = 'Driver Found';
+      waitSub.innerText = `Driver ${driverName} is on the way`;
+
+      // optional: msg may carry driver details (vehicle, avatar, license, etc.)
+      if (msg.driver_profile || msg.data && msg.data.driver_profile) {
+        const dp = msg.driver_profile || (msg.data && msg.data.driver_profile);
+        if (dp) {
+          if (dp.license_image || dp.profile_image) {
+            // driver profile_image may be base64
+            const b64 = dp.profile_image || dp.license_image;
+            driverAvatar.src = 'data:image/jpeg;base64,' + b64;
+            driverAvatar.style.display = '';
+          }
+          driverVehicleEl.innerText = `${dp.vehicle_model || ''} • ${dp.vehicle_number || ''}`;
+        }
+      } else {
+        // fallback: populate what we can
+        driverNameEl.innerText = driverName;
+        driverVehicleEl.innerText = vehicle || '';
+      }
+
+      driverInfo.style.display = 'flex';
+      driverNameEl.innerText = driverName;
+
+      // You may want to redirect to driver tracking page:
+      // window.location.href = `/passenger/ride/${rideId}/track/`;
+    }
+
+    if (status === 'ongoing') {
+      waitTitle.innerText = 'Trip started';
+      waitSub.innerText = 'Enjoy your ride';
+    }
+
+    if (status === 'completed') {
+      // may contain fare in msg.fare or msg.data.fare
+      const fare = (msg.fare) || (msg.data && msg.data.fare) || null;
+      waitTitle.innerText = 'Trip completed';
+      waitSub.innerText = fare ? ('Fare: PKR ' + (fare.total_fare || fare)) : 'Trip finished';
+      // close socket after completion
+      try { rideWebSocket.close(); } catch(e){}
+    }
+  };
+
+  rideWebSocket.onclose = () => {
+    console.log('Ride WS closed');
+    // keep UI: allow refresh or re-open
+    waitSub.innerText = 'Connection closed. You can refresh the panel.';
+  };
+
+  rideWebSocket.onerror = (err) => {
+    console.error('Ride WS error', err);
+    waitSub.innerText = 'Realtime error (check server console)';
+  };
+}
+
+/* Cancel & Refresh handlers */
+cancelRequestBtn.addEventListener('click', async () => {
+  if (!currentRideId) {
+    // try from localStorage
+    currentRideId = localStorage.getItem('currentRideId');
+  }
+  if (!currentRideId) {
+    waitingPanel.classList.add('hidden');
+    return;
+  }
+
+  const token = getAuthToken();
+  if (!token) return alert('Login required');
+
+  // If you have a cancel endpoint, call it. We'll try /api/rides/cancel/ (POST {ride_id})
+  try {
+    const res = await fetch('/api/rides/cancel/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({ride_id: currentRideId})
+    });
+    if (res.ok) {
+      alert('Ride cancelled');
+      waitingPanel.classList.add('hidden');
+      try { rideWebSocket.close(); } catch(e){}
+    } else {
+      const d = await res.json().catch(()=>null);
+      alert('Could not cancel: ' + (d && (d.detail || JSON.stringify(d)) || res.status));
+    }
+  } catch (err) {
+    console.error('Cancel error', err);
+    alert('Network error while cancelling.');
+  }
+});
+
+refreshBtn.addEventListener('click', () => {
+  if (currentRideId) openRideSocket(currentRideId);
+  else alert('No active ride to refresh.');
+});
+</script>
+
+</body>
+</html>
